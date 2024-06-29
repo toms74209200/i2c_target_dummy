@@ -2,7 +2,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 
-entity i2c_target_if is
+entity I2C_TARGET_IF is
     port (
         -- System --
         RESET_n     : in    std_logic;
@@ -16,11 +16,12 @@ entity i2c_target_if is
         ACC_RDATA   : out   std_logic_vector(7 downto 0);
         -- I2C Interface --
         SCL_IN      : in    std_logic;
-        SDA         : inout std_logic
+        SDA_IN      : in    std_logic;
+        SDA_OUT     : out   std_logic
     );
-end i2c_target_if;
+end I2C_TARGET_IF;
 
-architecture RTL of i2c_target_if is
+architecture RTL of I2C_TARGET_IF is
 
 signal sda_shift    : std_logic_vector(7 downto 0);
 signal scl_shift    : std_logic_vector(7 downto 0);
@@ -52,7 +53,7 @@ process (CLK, RESET_n) begin
     if (RESET_n = '0') then
         sda_shift <= (others => '0');
     elsif (CLK'event and CLK = '1') then
-        sda_shift <= sda_shift(6 downto 0) & SDA;
+        sda_shift <= sda_shift(6 downto 0) & SDA_IN;
     end if;
 end process;
 
@@ -67,9 +68,11 @@ process (CLK, RESET_n) begin
         if (i2c_rx_busy = '0') then
             if (scl_shift = X"FF" and sda_shift = X"F0") then
                 i2c_rx_busy <= '1';
+            elsif (cycle_count = 1 and bit_count = 0) then
+                i2c_rx_busy <= '1';
             end if;
         else
-            if (scl_shift = X"FF" and sda_shift = X"0F") then
+            if (bit_count = 8) then
                 i2c_rx_busy <= '0';
             end if;
         end if;
@@ -84,7 +87,7 @@ process (CLK, RESET_n) begin
     if (RESET_n = '0') then
         bit_count <= (others => '0');
     elsif (CLK'event and CLK = '1') then
-        if (i2c_rx_busy = '1' and scl_shift = X"F0") then
+        if ((i2c_rx_busy = '1' or i2c_tx_en = '1') and scl_shift = X"F0") then
             if (bit_count < 9) then
                 bit_count <= bit_count + 1;
             else
@@ -104,10 +107,10 @@ process (CLK, RESET_n) begin
     elsif (CLK'event and CLK = '1') then
         if (i2c_rx_busy = '1') then
             if (bit_count = 9 and scl_shift = X"F0") then
-                if (cycle_count = 2 and i2c_rx_data(7) = '1') then
-                    cycle_count <= "100";
-                elsif (cycle_count < 3) then
-                    cycle_count <= cycle_count + 1;
+                if (cycle_count = 0 and i2c_rx_data(7) = '1') then
+                    cycle_count <= "010";
+                elsif (cycle_count < 2) then
+                    cycle_count <= "001";
                 end if;
             end if;
         else
@@ -138,19 +141,20 @@ process (CLK, RESET_n) begin
     if (RESET_n = '0') then
         i2c_tx_data <= (others => '1');
     elsif (CLK'event and CLK = '1') then
-        if (cycle_count = 4) then
+        if (cycle_count = 0 and bit_count = 9 and i2c_rx_data(7) = '1') then
             i2c_tx_data <= X"A5";
-        elsif (scl_shift = X"F0") then
+        elsif (cycle_count = 2 and scl_shift = X"F0") then
             i2c_tx_data <= i2c_tx_data(6 downto 0) & '1';
+        else
+            i2c_tx_data <= (others => '0');
         end if;
     end if;
 end process;
 
-i2c_tx_en <= '1' when (bit_count = 9 and cycle_count = 1) else
-             '1' when (bit_count = 9 and cycle_count = 2) else
-             '1' when (bit_count = 9 and cycle_count = 3) else
-             '1' when (bit_count < 9 and cycle_count = 4) else '0';
+i2c_tx_en <= '1' when (bit_count = 8 and cycle_count = 0) else
+             '1' when (bit_count = 8 and cycle_count = 1) else
+             '1' when (bit_count = 8 and cycle_count = 2) else '0';
 
-SDA <= '0' when (i2c_tx_en = '1' and i2c_tx_data(7) = '0') else 'Z';
+SDA_OUT <= i2c_tx_data(7) when (i2c_tx_en = '1') else '1';
 
 end architecture RTL;
