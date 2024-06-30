@@ -110,8 +110,8 @@ initial begin
     SCL = 1;
     SDA_IN = 1;
 
-    ACC_WR = 0;
-    ACC_WDATA = 0;
+    ACC_RD = 0;
+    ACC_RDATA = 0;
 
     #(ResetTime);
     @(posedge CLK);
@@ -121,10 +121,6 @@ initial begin
 
     i2c_start_condition();
 
-    SDA_IN = 1;
-    #(I2cSclHalf);
-    @(posedge CLK);
-    i2c_clk();
     SDA_IN = 0;
     #(I2cSclHalf);
     @(posedge CLK);
@@ -141,6 +137,10 @@ initial begin
     #(I2cSclHalf);
     @(posedge CLK);
     i2c_clk();
+    SDA_IN = 1;
+    #(I2cSclHalf);
+    @(posedge CLK);
+    i2c_clk();
     SDA_IN = 0;
     #(I2cSclHalf);
     @(posedge CLK);
@@ -150,9 +150,15 @@ initial begin
     @(posedge CLK);
     i2c_clk();
     SDA_IN = 0;
+     #(I2cSclHalf);
+    @(posedge CLK);
+    i2c_clk();
+    SDA_IN = 1;
     #(I2cSclHalf);
     @(posedge CLK);
     `ChkValue("SDA_OUT", SDA_OUT, 0);
+    `ChkValue("ACC_WR", ACC_WR, 1);
+    `ChkValue("ACC_WDATA", ACC_WDATA, 8'h5A);
 
     #(I2cSclHalf);
     @(posedge CLK);

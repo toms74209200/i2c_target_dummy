@@ -8,12 +8,12 @@ entity I2C_TARGET_IF is
         RESET_n     : in    std_logic;
         CLK         : in    std_logic;
         -- Control --
-        ACC_WR      : in    std_logic;
-        ACC_RD      : out   std_logic;
-        FIFO_EMPTY  : out   std_logic;
-        FIFO_FULL   : out   std_logic;
-        ACC_WDATA   : in    std_logic_vector(7 downto 0);
-        ACC_RDATA   : out   std_logic_vector(7 downto 0);
+        ACC_WR      : out   std_logic;
+        ACC_RD      : in    std_logic;
+        FIFO_EMPTY  : in    std_logic;
+        FIFO_FULL   : in    std_logic;
+        ACC_WDATA   : out   std_logic_vector(7 downto 0);
+        ACC_RDATA   : in    std_logic_vector(7 downto 0);
         -- I2C Interface --
         SCL_IN      : in    std_logic;
         SDA_IN      : in    std_logic;
@@ -32,6 +32,8 @@ signal i2c_tx_data  : std_logic_vector(7 downto 0);
 signal i2c_sda_in   : std_logic;
 signal i2c_rx_busy  : std_logic;
 signal i2c_rx_data  : std_logic_vector(7 downto 0);
+
+signal acc_wr_i     : std_logic;
 
 begin
 -- ============================================================================
@@ -72,7 +74,7 @@ process (CLK, RESET_n) begin
                 i2c_rx_busy <= '1';
             end if;
         else
-            if (bit_count = 8) then
+            if (bit_count = 9) then
                 i2c_rx_busy <= '0';
             end if;
         end if;
@@ -151,10 +153,20 @@ process (CLK, RESET_n) begin
     end if;
 end process;
 
-i2c_tx_en <= '1' when (bit_count = 8 and cycle_count = 0) else
-             '1' when (bit_count = 8 and cycle_count = 1) else
-             '1' when (bit_count = 8 and cycle_count = 2) else '0';
+i2c_tx_en <= '1' when (bit_count = 9 and cycle_count = 0) else
+             '1' when (bit_count = 9 and cycle_count = 1) else
+             '1' when (bit_count = 9 and cycle_count = 2) else '0';
 
 SDA_OUT <= i2c_tx_data(7) when (i2c_tx_en = '1') else '1';
+
+
+-- ============================================================================
+-- FIFO Write
+-- ============================================================================
+acc_wr_i <= '1' when (bit_count = 9) else '0';
+
+ACC_WR <= acc_wr_i;
+
+ACC_WDATA <= i2c_rx_data when (acc_wr_i = '1') else (others => '0');
 
 end architecture RTL;
